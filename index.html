@@ -17,23 +17,23 @@
 
     <div id="agendamento" class="box">
         <h2>Agendar Corte</h2>
-        <input type="text" id="nome" placeholder="Nome Completo">
+        <input type="text" id="nome" placeholder="Nome Completo" required>
         <select id="posto">
             <option value="MN">MN</option><option value="CB">CB</option>
             <option value="3º SG">3º SG</option><option value="2º SG">2º SG</option>
             <option value="1º SG">1º SG</option><option value="SO">SO</option>
             <option value="OFICIAL">OFICIAL</option>
         </select>
-        <input type="tel" id="tel" placeholder="(00) 00000-0000" oninput="mascaraTel(this)">
-        <input type="date" id="data">
-        <input type="time" id="hora">
+        <input type="tel" id="tel" placeholder="(00)00000-0000" required oninput="mascaraTel(this)">
+        <input type="date" id="data" required>
+        <input type="time" id="hora" required>
         <button onclick="agendar()">Solicitar Agendamento</button>
         <hr>
         <button onclick="acessarPainel()" style="background:#555">🔓 Acessar Painel do Moura</button>
     </div>
 
     <div id="painel" class="box hidden">
-        <h2>Painel do Moura (Atualização Automática)</h2>
+        <h2>Painel do Moura</h2>
         <div id="lista"></div>
         <button onclick="location.reload()" style="background:#dc3545">Sair do Painel</button>
     </div>
@@ -42,18 +42,28 @@
         const SENHA_MOURA = "1234";
         let agendamentos = JSON.parse(localStorage.getItem('agenda')) || [];
 
-        // Máscara de Telefone
+        // Definir data mínima como hoje
+        const hoje = new Date().toISOString().split('T')[0];
+        document.getElementById('data').setAttribute('min', hoje);
+
         function mascaraTel(i) {
-            let v = i.value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
-            i.value = v.substring(0, 15);
+            let v = i.value.replace(/\D/g, '');
+            // Formato: (XX)XXXXX-XXXX
+            v = v.replace(/^(\d{2})(\d)/, '($1)$2');
+            v = v.replace(/(\d{5})(\d{4})$/, '$1-$2');
+            i.value = v.substring(0, 14);
         }
 
         function agendar() {
+            const nome = document.getElementById('nome').value;
+            const tel = document.getElementById('tel').value;
+            if (!nome || tel.length < 13) { alert("Preencha o nome e um telefone válido."); return; }
+
             const novo = {
                 id: Date.now(),
-                nome: document.getElementById('nome').value,
+                nome: nome,
                 posto: document.getElementById('posto').value,
-                tel: document.getElementById('tel').value,
+                tel: tel,
                 data: document.getElementById('data').value,
                 hora: document.getElementById('hora').value
             };
@@ -67,18 +77,19 @@
             if (senha === SENHA_MOURA) {
                 document.getElementById('agendamento').classList.add('hidden');
                 document.getElementById('painel').classList.remove('hidden');
-                
-                // Atualiza a tela imediatamente e a cada 5 segundos
                 render();
-                setInterval(render, 5000); 
             } else {
                 alert("Senha incorreta!");
             }
         }
 
+        function removerAgendamento(id) {
+            agendamentos = agendamentos.filter(a => a.id !== id);
+            localStorage.setItem('agenda', JSON.stringify(agendamentos));
+            render();
+        }
+
         function render() {
-            // Recarrega os dados do localStorage caso tenha havido novos agendamentos
-            agendamentos = JSON.parse(localStorage.getItem('agenda')) || [];
             const lista = document.getElementById('lista');
             lista.innerHTML = '';
             
@@ -86,15 +97,15 @@
                 const telLimpo = a.tel.replace(/\D/g, '');
                 const link = `https://wa.me/55${telLimpo}?text=Olá%20${a.nome},%20seu%20corte%20foi%20`;
                 
-                lista.innerHTML += `
-                    <div class="card">
-                        <strong>${a.posto} ${a.nome}</strong><br>
-                        Data: ${a.data} às ${a.hora}<br>
-                        Tel: ${a.tel}<br>
-                        <a href="${link}CONFIRMADO!" target="_blank" style="background:green">✅ Confirmar</a>
-                        <a href="${link}RECUSADO." target="_blank" style="background:red">❌ Recusar</a>
-                    </div>
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <strong>${a.posto} ${a.nome}</strong><br>
+                    ${a.data} às ${a.hora}<br>
+                    <a href="${link}CONFIRMADO!" target="_blank" style="background:green" onclick="setTimeout(() => removerAgendamento(${a.id}), 1000)">✅ Confirmar</a>
+                    <a href="${link}RECUSADO." target="_blank" style="background:red" onclick="setTimeout(() => removerAgendamento(${a.id}), 1000)">❌ Recusar</a>
                 `;
+                lista.appendChild(div);
             });
         }
     </script>
